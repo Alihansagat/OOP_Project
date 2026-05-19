@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.util.*;
 
 public class News implements Serializable, Comparable<News> {
+    private static final long serialVersionUID = 1L;
     private static int nextId = 1;
 
     private String newsId;

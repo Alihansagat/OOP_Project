@@ -6,7 +6,8 @@ import university.enums.UserType;
 import university.interfaces.Researcher;
 import java.util.*;
 
-public class Teacher extends Employee {
+public class Teacher extends Employee implements java.io.Serializable {
+    private static final long serialVersionUID = 1L;
     private static int complaintCounter = 1;
 
     private Position position;
@@ -24,13 +25,39 @@ public class Teacher extends Employee {
     }
 
     public void putMark(Student student, Course course, double att1, double att2, double finalExam) {
+        if (att1 < 0 || att1 > 30) {
+            System.out.println("First attestation must be between 0 and 30.");
+            return;
+        }
+
+        if (att2 < 0 || att2 > 30) {
+            System.out.println("Second attestation must be between 0 and 30.");
+            return;
+        }
+
+        if (finalExam < 0 || finalExam > 40) {
+            System.out.println("Final exam must be between 0 and 40.");
+            return;
+        }
+
+        double total = att1 + att2 + finalExam;
+
+        if (total > 100) {
+            System.out.println("Total grade cannot exceed 100.");
+            return;
+        }
+
         for (Mark m : student.getMarks()) {
             if (m.getCourse().equals(course)) {
-                m.setFirstAttestation(att1);
-                m.setSecondAttestation(att2);
+                // Using the exact setter methods referenced in your Main.java logic
+                m.setAttestation1(att1);
+                m.setAttestation2(att2);
                 m.setFinalExam(finalExam);
+
+                // Triggers student logic to evaluate fail counts and recalculate the 4.0 scale GPA
                 student.update(m);
-                System.out.println("Mark set for " + student.getFirstName() + " in " + course.getName() + ": " + m.computeTotal());
+
+                System.out.println("Mark set for " + student.getFirstName() + " in " + course.getName() + ": " + total);
                 return;
             }
         }

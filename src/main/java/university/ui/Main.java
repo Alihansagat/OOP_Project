@@ -7,6 +7,7 @@ import university.models.*;
 import university.service.AuthenticationService;
 import university.service.ResearchService;
 import university.storage.DataStorage;
+
 import java.time.LocalDate;
 import java.util.*;
 
@@ -14,11 +15,17 @@ public class Main {
     private static final Scanner scanner = new Scanner(System.in);
     private static final AuthenticationService authService = new AuthenticationService();
     private static final ResearchService researchService = new ResearchService();
+    private static final SwitchingLanguage lang = SwitchingLanguage.getInstance();
     private static User currentUser = null;
 
     public static void main(String[] args) {
-        seedData();
-        System.out.println("  Welcome to University Information System ");
+        DataStorage db = DataStorage.getInstance();
+        if (!db.loadFromDisk()) {
+            System.out.println("Database file not found. Initializing default data...");
+            seedData();
+        }
+
+        System.out.println("=== Welcome to University Information System ===");
 
         while (true) {
             if (currentUser == null) {
@@ -41,7 +48,7 @@ public class Main {
 
         // Teachers
         Teacher teacher1 = (Teacher) UserFactory.createUser(UserType.TEACHER, "Tomiris", "Abdildaeva", "Tomiris@kbtu.kz", "123");
-        teacher1.setPosition(Position.PROFESSOR);
+        if (teacher1 != null) teacher1.setPosition(Position.PROFESSOR);
         Teacher teacher2 = (Teacher) UserFactory.createUser(UserType.TEACHER, "Asylzhan", "Izbasar", "Asyl@kbtu.kz", "123");
         db.addUser(teacher1);
         db.addUser(teacher2);
@@ -75,67 +82,74 @@ public class Main {
         manager.assignCourseToTeacher(math, teacher2);
 
         // Research paper for professor
-        ResearcherDecorator professorResearcher = new ResearcherDecorator(teacher1);
-        ResearchPaper paper1 = new ResearchPaper("10.1/abc", "Deep Learning Study", Arrays.asList("Bob Smith", "Carol Jones"), "IEEE", 12, LocalDate.of(2023, 5, 10));
-        paper1.addCitation(); paper1.addCitation(); paper1.addCitation(); paper1.addCitation();
+        if (teacher1 != null) {
+            ResearcherDecorator professorResearcher = new ResearcherDecorator(teacher1);
+            ResearchPaper paper1 = new ResearchPaper("10.1/abc", "Deep Learning Study", Arrays.asList("Bob Smith", "Carol Jones"), "IEEE", 12, LocalDate.of(2023, 5, 10));
+            paper1.addCitation(); paper1.addCitation(); paper1.addCitation(); paper1.addCitation();
 
-        ResearchPaper paper2 = new ResearchPaper("10.2/def", "Cloud Computing Advances", Arrays.asList("Bob Smith"), "ACM", 8, LocalDate.of(2022, 3, 15));
-        paper2.addCitation(); paper2.addCitation(); paper2.addCitation();
+            ResearchPaper paper2 = new ResearchPaper("10.2/def", "Cloud Computing Advances", Arrays.asList("Bob Smith"), "ACM", 8, LocalDate.of(2022, 3, 15));
+            paper2.addCitation(); paper2.addCitation(); paper2.addCitation();
 
-        professorResearcher.addResearchPaper(paper1);
-        professorResearcher.addResearchPaper(paper2);
-        teacher1.assignResearcherRole(professorResearcher);
-        db.addPaper(paper1);
-        db.addPaper(paper2);
+            professorResearcher.addResearchPaper(paper1);
+            professorResearcher.addResearchPaper(paper2);
+            teacher1.assignResearcherRole(professorResearcher);
+            db.addPaper(paper1);
+            db.addPaper(paper2);
+            gradStudent.addResearchPaper(paper1);
+        }
 
         // Journal
-        Journal journal = new Journal("KBTU Research Journal", "SITE");
-        db.addJournal(journal);
-
-        // Grad student research
-        ResearcherDecorator gradResearcher = new ResearcherDecorator(null) {
-            @Override public String toString() { return "Madi Aslan (GraduateStudent)"; }
-        };
-        gradStudent.addResearchPaper(paper1);
+        // Journal journal = new Journal("KBTU Research Journal", "SITE");
+        // db.addJournal(journal);
 
         // News
         db.addNews(new News("Welcome!", "New semester has started.", "General"));
         db.addNews(new News("Research Conference", "Annual research conference upcoming.", "Research"));
 
-        System.out.println("System initialized with sample data.\n");
+        System.out.println("[System]: Initialized with sample data successfully.\n");
     }
 
     private static void showLoginMenu() {
-        System.out.println("\n--- LOGIN ---");
-        System.out.print("Email: ");
+        System.out.println("\n--- " + lang.getText("menu.login", "LOGIN") + " ---");
+        System.out.print(lang.getText("prompt.email", "Email") + ": ");
         String email = scanner.nextLine().trim();
-        System.out.print("Password: ");
+        System.out.print(lang.getText("prompt.password", "Password") + ": ");
         String password = scanner.nextLine().trim();
+
         currentUser = authService.login(email, password);
         if (currentUser != null) {
-            System.out.println("Logged in as: " + currentUser.getRole());
+            System.out.println(lang.getText("message.welcome", "Logged in successfully as: ") + currentUser.getRole());
+        } else {
+            System.out.println(lang.getText("error.credentials", "Invalid email or password."));
         }
     }
 
     private static void showRoleMenu() {
         switch (currentUser.getRole()) {
-            case STUDENT  -> showStudentMenu();
-            case TEACHER  -> showTeacherMenu();
-            case MANAGER  -> showManagerMenu();
-            case ADMIN    -> showAdminMenu();
+            case STUDENT -> showStudentMenu();
+            case TEACHER -> showTeacherMenu();
+            case MANAGER -> showManagerMenu();
+            case ADMIN -> showAdminMenu();
             case TECH_SUPPORT -> showTechSupportMenu();
-            default -> { System.out.println("Unknown role."); currentUser = null; }
+            default -> {
+                System.out.println(lang.getText("error.unknown_role", "Unknown role. Logged out."));
+                currentUser = null;
+            }
         }
     }
 
+    // =================================================================================
+    // STUDENT ROLE MENUS & ROUTING
+    // =================================================================================
     private static void showStudentMenu() {
         Student s = (Student) currentUser;
-        System.out.println("\n=== STUDENT MENU: " + s.getFirstName() + " ===");
-        System.out.println("1. View Dashboard   2. View Courses   3. Register for Course");
-        System.out.println("4. Drop Course      5. View Marks     6. View Transcript");
-        System.out.println("7. Rate Teacher     8. View News      9. Send Message");
-        System.out.println("10. Switch Language 11. Submit Tech Request  0. Logout");
-        System.out.print("Choice: ");
+        System.out.println("\n=== " + lang.getText("student.menu.title", "STUDENT MENU") + ": " + s.getFirstName() + " ===");
+        System.out.println("1. " + lang.getText("student.dashboard", "View Dashboard") + "   2. " + lang.getText("student.view_courses", "View Courses") + "   3. " + lang.getText("student.register_course", "Register for Course"));
+        System.out.println("4. " + lang.getText("student.drop_course", "Drop Course") + "       5. " + lang.getText("student.marks", "View Marks") + "         6. " + lang.getText("student.transcript", "View Transcript"));
+        System.out.println("7. " + lang.getText("student.rate_teacher", "Rate Teacher") + "    8. " + lang.getText("student.view_news", "View News") + "         9. " + lang.getText("student.send_message", "Send Message"));
+        System.out.println("10. " + lang.getText("menu.change_language", "Switch Language") + " 11. " + lang.getText("student.tech_request", "Submit Tech Request") + " 12. View Inbox " + "  0. " + lang.getText("menu.logout", "Logout"));
+
+        System.out.print(lang.getText("prompt.choice", "Choice") + ": ");
         String choice = scanner.nextLine().trim();
         switch (choice) {
             case "1" -> s.displayDashboard();
@@ -149,54 +163,77 @@ public class Main {
             case "9" -> sendMessage(s);
             case "10" -> switchLanguage(s);
             case "11" -> submitTechRequest(s);
+            case "12" -> s.viewInbox();
             case "0" -> logout();
-            default -> System.out.println("Invalid option.");
+            default -> System.out.println(lang.getText("error.invalid", "Invalid option."));
         }
     }
 
     private static void studentRegisterCourse(Student s) {
         viewAllCourses();
-        System.out.print("Enter course ID: ");
+        System.out.print(lang.getText("prompt.course_id", "Enter course ID") + ": ");
         String id = scanner.nextLine().trim();
         Course c = DataStorage.getInstance().getCourse(id);
-        if (c == null) { System.out.println("Course not found."); return; }
-        try { s.registerForCourse(c); }
-        catch (CourseRegistrationException e) { System.out.println("Error: " + e.getMessage()); }
+        if (c == null) {
+            System.out.println(lang.getText("error.course_not_found", "Course not found."));
+            return;
+        }
+        try {
+            s.registerForCourse(c);
+            System.out.println(lang.getText("message.registered_success", "Successfully registered for course!"));
+        } catch (CourseRegistrationException e) {
+            System.out.println(lang.getText("error.prefix", "Error") + ": " + e.getMessage());
+        }
     }
 
     private static void studentDropCourse(Student s) {
-        if (s.getRegisteredCourses().isEmpty()) { System.out.println("No registered courses."); return; }
+        if (s.getRegisteredCourses().isEmpty()) {
+            System.out.println(lang.getText("student.no_courses", "No registered courses found."));
+            return;
+        }
         s.getRegisteredCourses().forEach(c -> System.out.println(c.getCourseId() + " - " + c.getName()));
-        System.out.print("Enter course ID to drop: ");
+        System.out.print(lang.getText("prompt.drop_course_id", "Enter course ID to drop") + ": ");
         String id = scanner.nextLine().trim();
         Course c = DataStorage.getInstance().getCourse(id);
-        if (c != null) s.dropCourse(c);
-        else System.out.println("Course not found.");
+        if (c != null) {
+            s.dropCourse(c);
+            System.out.println(lang.getText("message.drop_success", "Course dropped successfully."));
+        } else {
+            System.out.println(lang.getText("error.course_not_found", "Course not found."));
+        }
     }
 
     private static void studentRateTeacher(Student s) {
         List<Teacher> teachers = DataStorage.getInstance().getTeachers();
         teachers.forEach(t -> System.out.println(t.getUserId() + " - " + t.getFirstName() + " " + t.getLastName() + " [" + t.getPosition() + "]"));
-        System.out.print("Enter teacher ID: ");
+        System.out.print(lang.getText("prompt.teacher_id", "Enter teacher ID") + ": ");
         String id = scanner.nextLine().trim();
         User u = DataStorage.getInstance().getUser(id);
         if (u instanceof Teacher) {
-            System.out.print("Rating (1-10): ");
+            System.out.print(lang.getText("prompt.rating", "Rating (1-10)") + ": ");
             try {
                 double rating = Double.parseDouble(scanner.nextLine().trim());
                 s.rateTeacher((Teacher) u, rating);
-            } catch (NumberFormatException e) { System.out.println("Invalid rating."); }
-        } else { System.out.println("Teacher not found."); }
+                System.out.println(lang.getText("message.rating_success", "Thank you for rating your instructor."));
+            } catch (NumberFormatException e) {
+                System.out.println(lang.getText("error.invalid_rating", "Invalid rating format."));
+            }
+        } else {
+            System.out.println(lang.getText("error.teacher_not_found", "Teacher not found."));
+        }
     }
 
-
+    // =================================================================================
+    // TEACHER ROLE MENUS & ROUTING
+    // =================================================================================
     private static void showTeacherMenu() {
         Teacher t = (Teacher) currentUser;
-        System.out.println("\n=== TEACHER MENU: " + t.getFirstName() + " ===");
-        System.out.println("1. Dashboard   2. View Courses   3. View Students in Course");
-        System.out.println("4. Put Mark    5. Send Complaint  6. View News");
-        System.out.println("7. Send Message  8. Switch Language  0. Logout");
-        System.out.print("Choice: ");
+        System.out.println("\n=== " + lang.getText("teacher.menu.title", "TEACHER MENU") + ": " + t.getFirstName() + " ===");
+        System.out.println("1. " + lang.getText("teacher.dashboard", "Dashboard") + "   2. " + lang.getText("teacher.view_courses", "View Courses") + "   3. " + lang.getText("teacher.view_students", "View Students in Course"));
+        System.out.println("4. " + lang.getText("teacher.put_mark", "Put Mark") + "   5. " + lang.getText("teacher.complaint", "Send Complaint") + "  6. " + lang.getText("teacher.view_news", "View News"));
+        System.out.println("7. " + lang.getText("teacher.send_message", "Send Message") + "  8. " + lang.getText("menu.change_language", "Switch Language") + "   0. " + lang.getText("menu.logout", "Logout"));
+
+        System.out.print(lang.getText("prompt.choice", "Choice") + ": ");
         String choice = scanner.nextLine().trim();
         switch (choice) {
             case "1" -> t.displayDashboard();
@@ -208,61 +245,86 @@ public class Main {
             case "7" -> sendMessage(t);
             case "8" -> switchLanguage(t);
             case "0" -> logout();
-            default -> System.out.println("Invalid option.");
+            default -> System.out.println(lang.getText("error.invalid", "Invalid option."));
         }
     }
 
     private static void teacherViewStudents(Teacher t) {
-        if (t.getCourses().isEmpty()) { System.out.println("No courses assigned."); return; }
+        if (t.getCourses().isEmpty()) {
+            System.out.println(lang.getText("teacher.no_courses", "No courses assigned."));
+            return;
+        }
         t.getCourses().forEach(c -> System.out.println(c.getCourseId() + " - " + c.getName()));
-        System.out.print("Enter course ID: ");
+        System.out.print(lang.getText("prompt.course_id", "Enter course ID") + ": ");
         String id = scanner.nextLine().trim();
         Course c = DataStorage.getInstance().getCourse(id);
         if (c != null) t.viewStudents(c);
-        else System.out.println("Course not found.");
+        else System.out.println(lang.getText("error.course_not_found", "Course not found."));
     }
 
     private static void teacherPutMark(Teacher t) {
-        if (t.getCourses().isEmpty()) { System.out.println("No courses assigned."); return; }
+        if (t.getCourses().isEmpty()) {
+            System.out.println(lang.getText("teacher.no_courses", "No courses assigned."));
+            return;
+        }
         t.getCourses().forEach(c -> System.out.println(c.getCourseId() + " - " + c.getName()));
-        System.out.print("Course ID: ");
+        System.out.print(lang.getText("prompt.course_id", "Enter course ID") + ": ");
         String cid = scanner.nextLine().trim();
         Course course = DataStorage.getInstance().getCourse(cid);
-        if (course == null) { System.out.println("Course not found."); return; }
-        course.getEnrolledStudents().forEach(s ->
-            System.out.println(s.getUserId() + " - " + s.getFirstName()));
-        System.out.print("Student ID: ");
+        if (course == null) {
+            System.out.println(lang.getText("error.course_not_found", "Course not found."));
+            return;
+        }
+        course.getEnrolledStudents().forEach(s -> System.out.println(s.getUserId() + " - " + s.getFirstName()));
+        System.out.print(lang.getText("prompt.student_id", "Student ID") + ": ");
         String sid = scanner.nextLine().trim();
         User u = DataStorage.getInstance().getUser(sid);
-        if (!(u instanceof Student)) { System.out.println("Student not found."); return; }
+        if (!(u instanceof Student)) {
+            System.out.println(lang.getText("error.student_not_found", "Student not found."));
+            return;
+        }
         try {
-            System.out.print("1st Attestation (0-30): ");
+            System.out.print(lang.getText("teacher.mark.a1", "1st Attestation (0-30)") + ": ");
             double a1 = Double.parseDouble(scanner.nextLine().trim());
-            System.out.print("2nd Attestation (0-30): ");
+            System.out.print(lang.getText("teacher.mark.a2", "2nd Attestation (0-30)") + ": ");
             double a2 = Double.parseDouble(scanner.nextLine().trim());
-            System.out.print("Final Exam (0-40): ");
+            System.out.print(lang.getText("teacher.mark.final", "Final Exam (0-40)") + ": ");
             double fe = Double.parseDouble(scanner.nextLine().trim());
             t.putMark((Student) u, course, a1, a2, fe);
-        } catch (NumberFormatException e) { System.out.println("Invalid input."); }
+            System.out.println(lang.getText("message.mark_success", "Marks successfully published."));
+        } catch (NumberFormatException e) {
+            System.out.println(lang.getText("error.invalid", "Invalid input."));
+        }
     }
 
     private static void teacherSendComplaint(Teacher t) {
         List<Manager> managers = DataStorage.getInstance().getManagers();
-        if (managers.isEmpty()) { System.out.println("No managers found."); return; }
+        if (managers.isEmpty()) {
+            System.out.println(lang.getText("manager.none_found", "No managers found."));
+            return;
+        }
         managers.forEach(m -> System.out.println(m.getUserId() + " - " + m.getFirstName()));
-        System.out.print("Manager ID: ");
+        System.out.print(lang.getText("prompt.manager_id", "Manager ID") + ": ");
         String mid = scanner.nextLine().trim();
         User mu = DataStorage.getInstance().getUser(mid);
-        if (!(mu instanceof Manager)) { System.out.println("Manager not found."); return; }
+        if (!(mu instanceof Manager)) {
+            System.out.println(lang.getText("error.manager_not_found", "Manager not found."));
+            return;
+        }
+
         List<Student> students = DataStorage.getInstance().getStudents();
         students.forEach(s -> System.out.println(s.getUserId() + " - " + s.getFirstName()));
-        System.out.print("Student ID: ");
+        System.out.print(lang.getText("prompt.student_id", "Student ID") + ": ");
         String sid = scanner.nextLine().trim();
         User su = DataStorage.getInstance().getUser(sid);
-        if (!(su instanceof Student)) { System.out.println("Student not found."); return; }
-        System.out.print("Reason: ");
+        if (!(su instanceof Student)) {
+            System.out.println(lang.getText("error.student_not_found", "Student not found."));
+            return;
+        }
+
+        System.out.print(lang.getText("prompt.reason", "Reason") + ": ");
         String reason = scanner.nextLine().trim();
-        System.out.println("Urgency: 1=LOW  2=MEDIUM  3=HIGH");
+        System.out.println(lang.getText("prompt.urgency", "Urgency: 1=LOW  2=MEDIUM  3=HIGH"));
         String ul = scanner.nextLine().trim();
         UrgencyLevel urgency = switch (ul) {
             case "2" -> UrgencyLevel.MEDIUM;
@@ -270,18 +332,22 @@ public class Main {
             default -> UrgencyLevel.LOW;
         };
         t.sendComplaint((Manager) mu, (Student) su, reason, urgency);
+        System.out.println(lang.getText("message.complaint_sent", "Complaint filed successfully."));
     }
 
-
+    // =================================================================================
+    // MANAGER ROLE MENUS & ROUTING
+    // =================================================================================
     private static void showManagerMenu() {
         Manager m = (Manager) currentUser;
-        System.out.println("\n=== MANAGER MENU: " + m.getFirstName() + " ===");
-        System.out.println("1. Dashboard          2. View Students by GPA");
-        System.out.println("3. View Students A-Z  4. Generate Academic Report");
-        System.out.println("5. View Complaints    6. Assign Teacher to Course");
-        System.out.println("7. Add News           8. View Tech Requests");
-        System.out.println("9. View News          10. Send Message   0. Logout");
-        System.out.print("Choice: ");
+        System.out.println("\n=== " + lang.getText("manager.menu.title", "MANAGER MENU") + ": " + m.getFirstName() + " ===");
+        System.out.println("1. " + lang.getText("manager.dashboard", "Dashboard") + "          2. " + lang.getText("manager.view_gpa", "View Students by GPA"));
+        System.out.println("3. " + lang.getText("manager.view_alpha", "View Students A-Z") + "  4. " + lang.getText("manager.report", "Generate Academic Report"));
+        System.out.println("5. " + lang.getText("manager.complaints", "View Complaints") + "    6. " + lang.getText("manager.assign_course", "Assign Teacher to Course"));
+        System.out.println("7. " + lang.getText("manager.add_news", "Add News") + "           8. " + lang.getText("manager.tech_requests", "View Tech Requests"));
+        System.out.println("9. " + lang.getText("manager.view_news", "View News") + "          10. " + lang.getText("manager.send_message", "Send Message") + "   0. " + lang.getText("menu.logout", "Logout"));
+
+        System.out.print(lang.getText("prompt.choice", "Choice") + ": ");
         String choice = scanner.nextLine().trim();
         DataStorage db = DataStorage.getInstance();
         switch (choice) {
@@ -296,44 +362,54 @@ public class Main {
             case "9" -> viewNews();
             case "10" -> sendMessage(m);
             case "0" -> logout();
-            default -> System.out.println("Invalid option.");
+            default -> System.out.println(lang.getText("error.invalid", "Invalid option."));
         }
     }
 
     private static void managerAssignTeacher(Manager m) {
         DataStorage db = DataStorage.getInstance();
-        db.getTeachers().forEach(t ->
-            System.out.println(t.getUserId() + " - " + t.getFirstName()));
-        System.out.print("Teacher ID: ");
+        db.getTeachers().forEach(t -> System.out.println(t.getUserId() + " - " + t.getFirstName()));
+        System.out.print(lang.getText("prompt.teacher_id", "Teacher ID") + ": ");
         User u = db.getUser(scanner.nextLine().trim());
-        if (!(u instanceof Teacher)) { System.out.println("Not found."); return; }
-        db.getAllCourses().forEach(c ->
-            System.out.println(c.getCourseId() + " - " + c.getName()));
-        System.out.print("Course ID: ");
+        if (!(u instanceof Teacher)) {
+            System.out.println(lang.getText("error.teacher_not_found", "Teacher not found."));
+            return;
+        }
+        db.getAllCourses().forEach(c -> System.out.println(c.getCourseId() + " - " + c.getName()));
+        System.out.print(lang.getText("prompt.course_id", "Course ID") + ": ");
         Course c = db.getCourse(scanner.nextLine().trim());
-        if (c == null) { System.out.println("Not found."); return; }
+        if (c == null) {
+            System.out.println(lang.getText("error.course_not_found", "Course not found."));
+            return;
+        }
         m.assignCourseToTeacher(c, (Teacher) u);
+        System.out.println(lang.getText("message.assigned_success", "Instructor assigned to course successfully."));
     }
 
     private static void managerAddNews(Manager m) {
-        System.out.print("Title: ");
+        System.out.print(lang.getText("news.title", "Title") + ": ");
         String title = scanner.nextLine().trim();
-        System.out.print("Content: ");
+        System.out.print(lang.getText("news.content", "Content") + ": ");
         String content = scanner.nextLine().trim();
-        System.out.print("Topic (e.g. Research / General): ");
+        System.out.print(lang.getText("news.topic", "Topic (e.g. Research / General)") + ": ");
         String topic = scanner.nextLine().trim();
         News news = new News(title, content, topic);
         List<News> newsList = new ArrayList<>(DataStorage.getInstance().getAllNews());
         m.manageNews(newsList, "add", news);
         DataStorage.getInstance().addNews(news);
+        System.out.println(lang.getText("message.news_added", "News post published successfully."));
     }
 
+    // =================================================================================
+    // ADMIN ROLE MENUS & ROUTING
+    // =================================================================================
     private static void showAdminMenu() {
         Admin a = (Admin) currentUser;
-        System.out.println("\n=== ADMIN MENU ===");
-        System.out.println("1. Dashboard   2. View All Users   3. Add User");
-        System.out.println("4. Remove User  5. View Logs   6. View News   0. Logout");
-        System.out.print("Choice: ");
+        System.out.println("\n=== " + lang.getText("admin.menu.title", "ADMIN MENU") + " ===");
+        System.out.println("1. " + lang.getText("admin.dashboard", "Dashboard") + "   2. " + lang.getText("admin.view_users", "View All Users") + "   3. " + lang.getText("admin.add_user", "Add User"));
+        System.out.println("4. " + lang.getText("admin.remove_user", "Remove User") + "  5. " + lang.getText("admin.logs", "View Logs") + "   6. " + lang.getText("admin.view_news", "View News") + "   0. " + lang.getText("menu.logout", "Logout"));
+
+        System.out.print(lang.getText("prompt.choice", "Choice") + ": ");
         String choice = scanner.nextLine().trim();
         switch (choice) {
             case "1" -> a.displayDashboard();
@@ -343,12 +419,12 @@ public class Main {
             case "5" -> a.viewLogs();
             case "6" -> viewNews();
             case "0" -> logout();
-            default -> System.out.println("Invalid option.");
+            default -> System.out.println(lang.getText("error.invalid", "Invalid option."));
         }
     }
 
     private static void adminAddUser(Admin a) {
-        System.out.println("Type: 1=Student 2=Teacher 3=Manager 4=TechSupport");
+        System.out.println(lang.getText("admin.type_prompt", "Type: 1=Student 2=Teacher 3=Manager 4=TechSupport"));
         String t = scanner.nextLine().trim();
         UserType type = switch (t) {
             case "1" -> UserType.STUDENT;
@@ -356,27 +432,36 @@ public class Main {
             case "3" -> UserType.MANAGER;
             default -> UserType.TECH_SUPPORT;
         };
-        System.out.print("First name: "); String fn = scanner.nextLine().trim();
-        System.out.print("Last name: ");  String ln = scanner.nextLine().trim();
-        System.out.print("Email: ");      String em = scanner.nextLine().trim();
-        System.out.print("Password: ");   String pw = scanner.nextLine().trim();
+        System.out.print(lang.getText("prompt.first_name", "First name") + ": "); String fn = scanner.nextLine().trim();
+        System.out.print(lang.getText("prompt.last_name", "Last name") + ": ");  String ln = scanner.nextLine().trim();
+        System.out.print(lang.getText("prompt.email", "Email") + ": ");      String em = scanner.nextLine().trim();
+        System.out.print(lang.getText("prompt.password", "Password") + ": ");   String pw = scanner.nextLine().trim();
+
         User user = UserFactory.createUser(type, fn, ln, em, pw);
-        a.addUser(user);
+        if (user != null) {
+            a.addUser(user);
+            System.out.println(lang.getText("message.registered", "User created and stored contextually."));
+        }
     }
 
     private static void adminRemoveUser(Admin a) {
         DataStorage.getInstance().getAllUsers().forEach(System.out::println);
-        System.out.print("Enter user ID to remove: ");
+        System.out.print(lang.getText("prompt.remove_id", "Enter user ID to remove") + ": ");
         String id = scanner.nextLine().trim();
         a.removeUser(id);
+        System.out.println(lang.getText("message.remove_success", "User profile cleared."));
     }
 
+    // =================================================================================
+    // TECH SUPPORT ROLE MENUS & ROUTING
+    // =================================================================================
     private static void showTechSupportMenu() {
         TechSupportSpecialist ts = (TechSupportSpecialist) currentUser;
-        System.out.println("\n=== TECH SUPPORT MENU: " + ts.getFirstName() + " ===");
-        System.out.println("1. Dashboard   2. View New Requests   3. Accept Request");
-        System.out.println("4. Reject Request   5. Mark Done   0. Logout");
-        System.out.print("Choice: ");
+        System.out.println("\n=== " + lang.getText("tech.menu.title", "TECH SUPPORT MENU") + ": " + ts.getFirstName() + " ===");
+        System.out.println("1. " + lang.getText("tech.dashboard", "Dashboard") + "   2. " + lang.getText("tech.new_requests", "View New Requests") + "   3. " + lang.getText("tech.accept", "Accept Request"));
+        System.out.println("4. " + lang.getText("tech.reject", "Reject Request") + "   5. " + lang.getText("tech.done", "Mark Done") + "   0. " + lang.getText("menu.logout", "Logout"));
+
+        System.out.print(lang.getText("prompt.choice", "Choice") + ": ");
         String choice = scanner.nextLine().trim();
         switch (choice) {
             case "1" -> ts.displayDashboard();
@@ -385,16 +470,20 @@ public class Main {
             case "4" -> techAction(ts, "reject");
             case "5" -> techAction(ts, "done");
             case "0" -> logout();
-            default -> System.out.println("Invalid option.");
+            default -> System.out.println(lang.getText("error.invalid", "Invalid option."));
         }
     }
 
     private static void techAction(TechSupportSpecialist ts, String action) {
         List<TechRequest> reqs = DataStorage.getInstance().getTechRequests();
-        if (reqs.isEmpty()) { System.out.println("No requests."); return; }
-        for (int i = 0; i < reqs.size(); i++)
-            System.out.println((i+1) + ". " + reqs.get(i));
-        System.out.print("Request number: ");
+        if (reqs.isEmpty()) {
+            System.out.println(lang.getText("tech.no_requests", "No active support tickets."));
+            return;
+        }
+        for (int i = 0; i < reqs.size(); i++) {
+            System.out.println((i + 1) + ". " + reqs.get(i));
+        }
+        System.out.print(lang.getText("prompt.ticket_number", "Request ticket number") + ": ");
         try {
             int idx = Integer.parseInt(scanner.nextLine().trim()) - 1;
             TechRequest req = reqs.get(idx);
@@ -404,18 +493,23 @@ public class Main {
                 case "reject" -> ts.rejectRequest(req);
                 case "done"   -> ts.markDone(req);
             }
-        } catch (Exception e) { System.out.println("Invalid selection."); }
+            System.out.println(lang.getText("message.ticket_updated", "Ticket state adjusted successfully."));
+        } catch (Exception e) {
+            System.out.println(lang.getText("error.invalid", "Invalid selection index."));
+        }
     }
 
-
+    // =================================================================================
+    // GLOBAL HELPERS & UTILITIES
+    // =================================================================================
     private static void viewAllCourses() {
-        System.out.println("=== Available Courses ===");
+        System.out.println("=== " + lang.getText("course.available_title", "Available Courses") + " ===");
         DataStorage.getInstance().getAllCourses().forEach(c ->
-            System.out.println("  " + c.getCourseId() + " | " + c));
+                System.out.println("  " + c.getCourseId() + " | " + c));
     }
 
     private static void viewNews() {
-        System.out.println("=== News Feed ===");
+        System.out.println("=== " + lang.getText("news.feed_title", "News Feed") + " ===");
         DataStorage.getInstance().getAllNews().forEach(n -> System.out.println("  " + n));
     }
 
@@ -424,36 +518,52 @@ public class Main {
             if (!u.getUserId().equals(sender.getUserId()))
                 System.out.println(u.getUserId() + " - " + u.getFirstName() + " " + u.getLastName());
         });
-        System.out.print("Recipient ID: ");
+        System.out.print(lang.getText("prompt.recipient_id", "Recipient ID") + ": ");
         String id = scanner.nextLine().trim();
         User recipient = DataStorage.getInstance().getUser(id);
-        if (recipient == null) { System.out.println("User not found."); return; }
-        System.out.print("Message: ");
+        if (recipient == null) {
+            System.out.println(lang.getText("error.user_not_found", "Recipient profile not found."));
+            return;
+        }
+        System.out.print(lang.getText("prompt.message_body", "Message Body") + ": ");
         String content = scanner.nextLine().trim();
         sender.sendMessage(recipient, content);
+        System.out.println(lang.getText("message.sent_success", "Message transmitted successfully."));
     }
 
     private static void switchLanguage(User user) {
-        System.out.println("1=KZ  2=EN  3=RU");
+        System.out.println("1=KZ   2=EN   3=RU");
+        System.out.print(lang.getText("prompt.select", "Select language preference") + ": ");
         String choice = scanner.nextLine().trim();
-        Language lang = switch (choice) {
+        Language selectedLanguage = switch (choice) {
             case "1" -> Language.KZ;
             case "3" -> Language.RU;
             default -> Language.EN;
         };
-        user.switchLanguage(lang);
+
+        // Synchronizes language changes globally with SwitchingLanguage singleton
+        lang.setLanguage(selectedLanguage);
+        user.switchLanguage(selectedLanguage);
+        System.out.println(lang.getText("message.lang_changed", "System localization environment updated successfully."));
     }
 
     private static void submitTechRequest(User user) {
-        System.out.print("Describe your issue: ");
+        System.out.print(lang.getText("prompt.issue_desc", "Describe your hardware/software issue") + ": ");
         String desc = scanner.nextLine().trim();
         TechRequest req = new TechRequest(user, desc);
         DataStorage.getInstance().addTechRequest(req);
-        System.out.println("Tech request submitted. Status: " + req.getStatus());
+        System.out.println(lang.getText("message.tech_submitted", "Tech ticket recorded. Current Status") + ": " + req.getStatus());
     }
 
     private static void logout() {
-        authService.logout(currentUser);
-        currentUser = null;
+        if (currentUser != null) {
+            authService.logout(currentUser);
+
+            // Автоматически сохраняем измененные данные на диск при выходе пользователя
+            DataStorage.getInstance().saveToDisk();
+
+            System.out.println("Сессия закрыта. Данные сохранены.");
+            currentUser = null;
+        }
     }
 }

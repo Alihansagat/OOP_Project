@@ -5,6 +5,7 @@ import java.io.Serializable;
 import java.time.LocalDateTime;
 
 public class TechRequest implements Serializable {
+    private static final long serialVersionUID = 1L;
     private static int nextId = 1;
 
     private String requestId;

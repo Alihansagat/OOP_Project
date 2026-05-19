@@ -30,7 +30,7 @@ public final class SwitchingLanguage {
         return currentLanguage;
     }
 
-    public String getText(String key) {
+    public String getText(String key, String s) {
         Map<String, String> map = translations.get(currentLanguage);
         if (map == null) {
             return "[" + key + "]";
@@ -254,7 +254,7 @@ public final class SwitchingLanguage {
         put(Language.KZ, "student.rate_teacher",     "Оқытушыны бағалау");
         put(Language.KZ, "student.view_news",        "Жаңалықтарды көру");
         put(Language.KZ, "student.subscribe",        "Журналға жазылу");
-        put(Language.KZ, "student.info",             "Менің мәліметтерім");
+        put(Language.KZ, "student.info",             "Mentің мәліметтерім");
         put(Language.KZ, "student.tech_request",     "Тех. сұрау жіберу");
         put(Language.KZ, "menu.logout",              "Шығу");
 

@@ -3,6 +3,7 @@ package university.models;
 import java.io.Serializable;
 
 public class Mark implements Serializable, Comparable<Mark> {
+    private static final long serialVersionUID = 1L;
 
     private Student student;
     private Course course;
@@ -40,9 +41,9 @@ public class Mark implements Serializable, Comparable<Mark> {
     public Student getStudent() { return student; }
     public Course getCourse() { return course; }
     public double getFirstAttestation() { return firstAttestation; }
-    public void setFirstAttestation(double v) { this.firstAttestation = v; }
+    public void setAttestation1(double v) { this.firstAttestation = v; }
     public double getSecondAttestation() { return secondAttestation; }
-    public void setSecondAttestation(double v) { this.secondAttestation = v; }
+    public void setAttestation2(double v) { this.secondAttestation = v; }
     public double getFinalExam() { return finalExam; }
     public void setFinalExam(double v) { this.finalExam = v; }
 

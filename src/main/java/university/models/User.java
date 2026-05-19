@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Objects;
 
 public abstract class User implements Serializable {
+    private static final long serialVersionUID = 1L;
     private static int nextId = 1;
 
     private String userId;
